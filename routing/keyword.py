@@ -169,7 +169,7 @@ class KeywordRouter:
         def weight_func(u, v, edge_dict):
             data = list(edge_dict.values())[0] if isinstance(edge_dict, dict) else edge_dict
             base_cost = data.get("length", 1.0)
-            if not rules and not speed_rules:
+            if not rules:
                 return base_cost
 
             mult = 1.0
