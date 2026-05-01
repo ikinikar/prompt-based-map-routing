@@ -1,14 +1,7 @@
 import re
-import networkx as nx
-import osmnx as ox
-from typing import Literal, List, Tuple, Dict
+from typing import List, Dict, Callable
 
-# ---------------------------------------------------------------------------
-# Pattern table: (compiled_regex, category, osm_values, polarity)
-#   polarity = "avoid"  → multiply edge weight UP   (penalty)
-#   polarity = "prefer" → multiply edge weight DOWN  (reward)
-# ---------------------------------------------------------------------------
-from typing import Literal
+from routing.router import Router
 
 # Speed tiers for maxspeed_imputed (mph)
 # Used separately in weight_func since maxspeed is continuous
@@ -146,14 +139,29 @@ AVOID_MULT  = 25.0   # same scale as your NER weights[0]
 PREFER_MULT = 0.04   # same scale as your NER weights[1]
 
 
-class KeywordRouter:
+class KeywordRouter(Router):
+    """
+    Rule-based router that matches regex patterns against the prompt to
+    identify OSM tag preferences, then builds a weight function accordingly.
+
+    Args:
+        graph:      OSMnx/NetworkX MultiDiGraph of the road network.
+        avoid_mult: Multiplier applied to edges matching "avoid" rules (penalty).
+        prefer_mult: Multiplier applied to edges matching "prefer" rules (reward).
+    """
+
     def __init__(self, graph, avoid_mult=AVOID_MULT, prefer_mult=PREFER_MULT):
-        self.graph = graph
+        super().__init__(graph)
         self.avoid_mult = avoid_mult
         self.prefer_mult = prefer_mult
 
     def _parse_prompt(self, prompt: str) -> List[Dict]:
-        """Return list of active rules: {category, osm_values, polarity}."""
+        """
+        Scan the prompt against KEYWORD_RULES and return all matching rules.
+
+        Returns:
+            List of dicts, each with keys: category, osm_values, polarity.
+        """
         hits = []
         for pattern, category, values, polarity in KEYWORD_RULES:
             if pattern.search(prompt):
@@ -162,8 +170,11 @@ class KeywordRouter:
                              "polarity": polarity})
         return hits
 
-    def find_route(self, start_node, end_node, prompt: str,
-                   algorithm: Literal["dijkstra", "astar"] = "dijkstra"):
+    def _build_weight_func(self, prompt: str) -> Callable[[int, int, dict], float]:
+        """
+        Parse the prompt for keyword rules and return a weight function that
+        penalizes or rewards edges based on matched OSM tag patterns.
+        """
         rules = self._parse_prompt(prompt)
 
         def weight_func(u, v, edge_dict):
@@ -173,10 +184,8 @@ class KeywordRouter:
                 return base_cost
 
             mult = 1.0
-
             for rule in rules:
                 if rule["category"] == "maxspeed":
-                    # Handle continuous speed separately
                     speed = data.get("maxspeed_imputed")
                     if speed is None:
                         continue
@@ -190,22 +199,9 @@ class KeywordRouter:
                     if actual is None:
                         continue
                     current_vals = actual if isinstance(actual, list) else [str(actual)]
-                    if any(v in rule["osm_values"] for v in current_vals):
+                    if any(val in rule["osm_values"] for val in current_vals):
                         mult *= self.avoid_mult if rule["polarity"] == "avoid" else self.prefer_mult
 
             return base_cost * mult
 
-        def heuristic(n, target):
-            nd, td = self.graph.nodes[n], self.graph.nodes[target]
-            return ox.distance.great_circle(nd["y"], nd["x"], td["y"], td["x"])
-
-        try:
-            if algorithm == "astar":
-                return nx.astar_path(self.graph, start_node, end_node,
-                                     heuristic=heuristic, weight=weight_func)
-            else:
-                return nx.dijkstra_path(self.graph, start_node, end_node,
-                                        weight=weight_func)
-        except Exception as e:
-            print(f"Routing error ({algorithm}): {e}")
-            return None
+        return weight_func
