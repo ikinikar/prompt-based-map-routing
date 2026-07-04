@@ -1,4 +1,3 @@
-# prompt-based-map-routing
 # Prompt-Based Route Mapping
 
 This project compares six methods for translating a natural-language prompt into a valid route on a real road network, ranging from a plain shortest-path baseline to a cross-attention model that directly adjusts edge weights to a particle-based search to generate candidate paths evaluated by an LLM. 
