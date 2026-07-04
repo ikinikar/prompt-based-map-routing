@@ -2,7 +2,7 @@
 
 This project compares six methods for translating a natural-language prompt into a valid route on a real road network, ranging from a plain shortest-path baseline to a cross-attention model that directly adjusts edge weights to a particle-based search to generate candidate paths evaluated by an LLM. 
 
-Ongoing developments are focused on engineering a new method that uses GRPO to fine-tune an LLM to generate weights for A* search, refining the synthetic data, and organizing the repo.
+New developments are focused on engineering a new method that uses GRPO to fine-tune an LLM to generate weights for A* search, refining the synthetic data, and organizing the repo.
 
 ## Overview
 
@@ -155,6 +155,7 @@ Using the Pareto front over deviation penalty and constraint satisfaction, four 
 
 ## Future Work
 
+- Experimenting with methods to increase the utility of an LLM for prompt-based map routing
 - Increase prompt variety and diversity, clean up any problematic prompts
 - Add queries requiring geospatial awareness, such as proximity to a landmark not directly on the graph
 - Quantify the resource usage of each method directly, since resource efficiency was a research question but was not measured explicitly
